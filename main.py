@@ -1,10 +1,5 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import (
-    NoSuchElementException,
-    ElementNotInteractableException,
-)
+from driver import Driver
 import time
 import re
 import os
@@ -23,7 +18,6 @@ LOG_FILE = "sent.csv"
 
 sent_logs = None
 
-driver = None
 inaction_delay = 0
 
 # Create DB during the first run
@@ -52,85 +46,21 @@ def relevance_check(url):
     return True
 
 
-def wait_till_you_get(identifier, by, all=False, click_xpath="", visible_check=True):
-    while True:
-        try:
-            elements = driver.find_elements(by, identifier)
-            if not all:
-                if (not visible_check) or (
-                    elements and elements[0].is_displayed() and elements[0].is_enabled()
-                ):
-                    return elements[0]
-                else:
-                    if click_xpath:
-                        wait_till_you_get(click_xpath, By.XPATH).click()
-            else:
-                return elements
-        except NoSuchElementException:
-            if click_xpath:
-                wait_till_you_get(click_xpath, By.XPATH).click()
-
-
-def wait_as_long_as(identifier, by):
-    while True:
-        try:
-            driver.find_element(by, identifier)
-        except (NoSuchElementException):
-            break
-
-
-def send_keys_when_you_can(element, key):
-    while True:
-        try:
-            element.send_keys(key)
-            break
-        except ElementNotInteractableException:
-            pass
-
-
-def web_driver_load(browser):
-    global driver
-    if browser.lower() == "chrome":
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--disable-notifications")
-        chrome_options.add_argument("--mute-audio")
-        driver = webdriver.Chrome(options=chrome_options)
-    elif browser.lower() == "firefox":
-        driver = webdriver.Firefox()
-    else:
-        print("Browser not supported\n")
-
-
-def web_driver_quit():
-    driver.quit()
-
-
-def google_login(google_creds):
-    driver.get("https://accounts.google.com/servicelogin")
-    wait_till_you_get("identifier", By.NAME).send_keys(
-        google_creds["username"], Keys.RETURN
-    )
-    wait_till_you_get("password", By.NAME).send_keys(
-        google_creds["password"], Keys.RETURN
-    )
-    wait_as_long_as("password", By.NAME)
-
-
-def comment_in_shorts(url, comment, log):
+def comment_in_shorts(driver, url, comment, log):
     driver.get(url)
     channel = ""
     try:
         channel = (
-            wait_till_you_get("channel-name", By.ID)
+            driver.wait_till_you_get("channel-name", By.ID)
             .find_element(By.CLASS_NAME, "yt-formatted-string")
             .text
         )
     except:
         pass
-    wait_till_you_get("comments-button", By.ID).click()
-    wait_till_you_get("placeholder-area", By.ID).click()
-    wait_till_you_get("contenteditable-root", By.ID).send_keys(comment)
-    wait_till_you_get("submit-button", By.ID).click()
+    driver.wait_till_you_get("comments-button", By.ID).click()
+    driver.wait_till_you_get("placeholder-area", By.ID).click()
+    driver.wait_till_you_get("contenteditable-root", By.ID).send_keys(comment)
+    driver.wait_till_you_get("submit-button", By.ID).click()
     append_sent_logs(
         {
             "url": url,
@@ -144,21 +74,21 @@ def comment_in_shorts(url, comment, log):
     time.sleep(inaction_delay)
 
 
-def comment_in_video(url, comment, log):
+def comment_in_video(driver, url, comment, log):
     driver.get(url)
     channel = ""
     try:
         channel = (
-            wait_till_you_get("channel-name", By.ID)
+            driver.wait_till_you_get("channel-name", By.ID)
             .find_element(By.CLASS_NAME, "yt-formatted-string")
             .text
         )
     except:
         pass
-    wait_till_you_get("comment-teaser", By.ID).click()
-    wait_till_you_get("placeholder-area", By.ID).click()
-    wait_till_you_get("contenteditable-root", By.ID).send_keys(comment)
-    wait_till_you_get("submit-button", By.ID).click()
+    driver.wait_till_you_get("comment-teaser", By.ID).click()
+    driver.wait_till_you_get("placeholder-area", By.ID).click()
+    driver.wait_till_you_get("contenteditable-root", By.ID).send_keys(comment)
+    driver.wait_till_you_get("submit-button", By.ID).click()
     append_sent_logs(
         {
             "url": url,
@@ -178,7 +108,7 @@ def generate_comment(comment_config):
     return syntax.format(LINK=link)
 
 
-def target_top_daily(top_daily_config, comment_config):
+def target_top_daily(driver, top_daily_config, comment_config):
     search_url = (
         "https://www.youtube.com/results?search_query={TERM}&sp=CAMSBAgCEAE%253D"
     )
@@ -190,7 +120,7 @@ def target_top_daily(top_daily_config, comment_config):
         search_term = search_term.replace(" ", "+")
         driver.get(search_url.format(TERM=search_term))
 
-        video_elems = wait_till_you_get(
+        video_elems = driver.wait_till_you_get(
             "title-and-badge", By.CLASS_NAME, all=True, visible_check=False
         )[:count]
         youtube_urls = {"video": [], "shorts": []}
@@ -214,6 +144,7 @@ def target_top_daily(top_daily_config, comment_config):
         for short_url in youtube_urls["shorts"]:
             if relevance_check(short_url) and not spam_check(short_url):
                 comment_in_shorts(
+                    driver=driver,
                     url=short_url,
                     comment=generate_comment(comment_config),
                     log={
@@ -224,6 +155,7 @@ def target_top_daily(top_daily_config, comment_config):
         for video_url in youtube_urls["video"]:
             if relevance_check(short_url) and not spam_check(short_url):
                 comment_in_video(
+                    driver=driver,
                     url=video_url,
                     comment=generate_comment(comment_config),
                     log={
@@ -264,13 +196,15 @@ if __name__ == "__main__":
             columns=["url", "channel", "ts", "type", "comment", "meta"]
         )
 
+    driver = Driver(browser)
+    
     try:
-        web_driver_load(browser)
-        google_login(google_creds)
+        driver.web_driver_load()
+        driver.google_login(google_creds)
 
-        target_top_daily(top_daily_config, comment_config)
+        target_top_daily(driver, top_daily_config, comment_config)
     finally:
-        web_driver_quit()
-
-    sent_logs.to_csv(LOG_FILE, index=False)
+        sent_logs.to_csv(LOG_FILE, index=False)
+        driver.web_driver_quit()
+        
     print("Done n Dusted. Now we wait.")
