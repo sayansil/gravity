@@ -1,0 +1,21 @@
+{
+    "BROWSER": "Chrome",
+    "GOOGLE_USERNAME": "",
+    "GOOGLE_PASSWORD": "",
+    "TOP-DAILY": {
+        "COUNT": 2,
+        "SEARCH-TERMS": ["sketch", "painting"]
+    },
+    "COMMENT": {
+        "SYNTAX": [
+            "Damn! That was gorgeous! Reminds me of {LINK}",
+            "That was so cool! My friend tried something similar {LINK}",
+            "OMG! I immediately thought about {LINK}"
+        ],
+        "LINKS": [
+            "link1",
+            "link2"
+        ]
+    },
+    "INACTION_DELAY": 5
+}
